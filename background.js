@@ -1,3 +1,4 @@
+// Handle messages for different actions of the extension
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'getPixelColor') {
         handleColorPickerRequest(sender.tab.id, message.coordinates, sendResponse);
@@ -15,6 +16,21 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
 });
 
+// Listen for the pick-color keyboard shortcut
+browser.commands.onCommand.addListener((command) => {
+    if (command === "startColorPicking") {
+        // Get the active tab and start color picking
+        browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
+            if (tabs[0]) {
+                handleStartColorPicking(tabs[0].id, (response) => {
+                    console.log('Color picker started via keyboard shortcut:', response);
+                });
+            }
+        });
+    }
+});
+
+// Handle the color picker request
 async function handleColorPickerRequest(tabId, coordinates, sendResponse) {
     try {
         if (!tabId) {
@@ -53,22 +69,117 @@ async function handleColorPickerRequest(tabId, coordinates, sendResponse) {
     }
 }
 
-function injectColorPickerOverlay() {
+function injectResultOverlay() {
     try {
-        const existingOverlay = document.getElementById('color-picker-overlay');
+        const existingOverlay = document.getElementById('result-overlay');
         if (existingOverlay) existingOverlay.remove();
+        
+        // Inject CSS if not already present
+        if (!document.getElementById('overlay-styles')) {
+            const link = document.createElement('link');
+            link.id = 'overlay-styles';
+            link.rel = 'stylesheet';
+            link.href = browser.runtime.getURL('overlay.css');
+            document.head.appendChild(link);
+        }
+        
         const overlay = document.createElement('div');
-        overlay.id = 'color-picker-overlay';
-        overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: transparent; cursor: crosshair; z-index: 999999; pointer-events: auto;';
-        overlay.addEventListener('click', function(e) {
-            e.preventDefault(); e.stopPropagation();
-            window.dispatchEvent(new CustomEvent('ColorPicked', { detail: { x: e.clientX, y: e.clientY } }));
-            overlay.remove();
-        });
+        overlay.id = 'result-overlay';
+        
+        overlay.innerHTML = `
+            <div class="result-overlay-content">
+                <div class="color-preview-box-container">
+                    <div class="color-preview-box" style="background: color.lighter;"></div>
+                    <div class="color-preview-box-selected" style="background: color.hex;"></div>
+                    <div class="color-preview-box" style="background: color.darker;"></div>
+                </div>
+                <p class="color-hex">color.hex</p>
+                <p class="color-rgb">color.rgb</p>
+            </div>
+        `;
+
         const handleEscape = function(e) {
-            if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', handleEscape); }
+            if (e.key === 'Escape') { 
+                overlay.remove(); 
+                document.removeEventListener('keydown', handleEscape); 
+            }
         };
         document.addEventListener('keydown', handleEscape);
+        document.body.appendChild(overlay);
+    } catch (err) {
+        console.error('Result overlay injection error:', err);
+    }
+}
+
+function StringifyResultOverlay(color) {
+    let lighter = "rgb(" + color.rgb.replace("rgb(", "").replace(")", "").split(",").map(Number).map(x => Math.min(Math.round(x * 1.2), 255)).join(",") + ")";
+    let darker = "rgb(" + color.rgb.replace("rgb(", "").replace(")", "").split(",").map(Number).map(x => Math.max(Math.round(x * 0.8), 0)).join(",") + ")";
+    return `(${injectResultOverlay.toString()})()`.replaceAll("color.hex", color.hex).replaceAll("color.rgb", color.rgb).replaceAll("color.lighter", lighter).replaceAll("color.darker", darker);
+}
+
+async function handleResultOverlay(tabId, color) {
+    try {
+        await browser.tabs.executeScript(tabId, {
+            code: StringifyResultOverlay(color)
+        });
+    } catch (error) {
+        console.error('Error injecting result overlay:', error);
+    }
+}
+
+function injectColorPickerOverlay() {
+    try {
+        // Remove any existing overlays
+        const existingOverlay = document.getElementById('color-picker-overlay');
+        if (existingOverlay) existingOverlay.remove();
+        
+        // Inject CSS if not already present
+        if (!document.getElementById('overlay-styles')) {
+            const link = document.createElement('link');
+            link.id = 'overlay-styles';
+            link.rel = 'stylesheet';
+            link.href = browser.runtime.getURL('overlay.css');
+            document.head.appendChild(link);
+        }
+        
+        // Create the overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'color-picker-overlay';
+        
+        // Handle click events
+        overlay.addEventListener('click', function(e) {
+            e.preventDefault(); 
+            e.stopPropagation();
+            
+            const coordinates = { x: e.clientX, y: e.clientY };
+            overlay.remove();
+            
+            // Send message to background script
+            browser.runtime.sendMessage({
+                action: 'getPixelColor',
+                coordinates: coordinates
+            }).then(function(response) {
+                if (response && response.success) {
+                    browser.runtime.sendMessage({
+                        action: 'ShowResultOverlay',
+                        color: response.data
+                    });
+                }
+            }).catch(function(error) {
+                console.error('Error getting pixel color:', error);
+            });
+        });
+        
+        // Handle escape key
+        const handleEscape = function(e) {
+            if (e.key === 'Escape') { 
+                overlay.remove(); 
+                document.removeEventListener('keydown', handleEscape); 
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+        
+        // Add overlay to page
         document.body.appendChild(overlay);
     } catch (err) {
         console.error('Overlay injection error:', err);
@@ -81,51 +192,14 @@ async function handleStartColorPicking(tabId, sendResponse) {
             sendResponse({ success: false, error: 'No tab ID provided' });
             return;
         }
+        
         await browser.tabs.executeScript(tabId, {
             code: `(${injectColorPickerOverlay.toString()})();`
         });
+        
         sendResponse({ success: true });
     } catch (error) {
         console.error('Error starting color picker:', error);
         sendResponse({ success: false, error: error.message });
-    }
-} 
-
-function injectResultOverlay() {
-    try {
-        const existingOverlay = document.getElementById('result-overlay');
-        if (existingOverlay) existingOverlay.remove();
-        const overlay = document.createElement('div');
-        overlay.id = 'result-overlay';
-        overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 999999; pointer-events: auto;';
-        overlay.innerHTML = `
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: color.hex; color: white; padding: 10px; border-radius: 5px;">
-                <p>Color: color.hex</p>
-                <p>RGB: color.rgb</p>
-            </div>
-        `;
-
-        const handleEscape = function(e) {
-            if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', handleEscape); }
-        };
-        document.addEventListener('keydown', handleEscape);
-
-        document.body.appendChild(overlay);
-    } catch (err) {
-        console.error('Result overlay injection error:', err);
-    }
-}
-
-function StringifyResultOverlay(color) {
-    return `(${injectResultOverlay.toString()})()`.replaceAll("color.hex", color.hex).replaceAll("color.rgb", color.rgb);
-}
-
-async function handleResultOverlay(tabId, color) {
-    try {
-        await browser.tabs.executeScript(tabId, {
-            code: StringifyResultOverlay(color)
-        });
-    } catch (error) {
-        console.error('Error injecting result overlay:', error);
     }
 }
