@@ -30,6 +30,22 @@ browser.commands.onCommand.addListener((command) => {
     }
 });
 
+// RGB to HEX
+function rgbToHex(r, g, b) {
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+
+function formatColorData(r, g, b, a) {
+    return {
+        r: r,
+        g: g,
+        b: b,
+        a: a,
+        hex: rgbToHex(r, g, b),
+        rgb: `rgb(${r}, ${g}, ${b})`
+    }
+}
+
 // Handle the color picker request
 async function handleColorPickerRequest(tabId, coordinates, sendResponse) {
     try {
@@ -47,14 +63,7 @@ async function handleColorPickerRequest(tabId, coordinates, sendResponse) {
                 canvas.height = img.height;
                 ctx.drawImage(img, 0, 0);
                 const pixelData = ctx.getImageData(coordinates.x, coordinates.y, 1, 1).data;
-                const color = {
-                    r: pixelData[0],
-                    g: pixelData[1],
-                    b: pixelData[2],
-                    a: pixelData[3],
-                    hex: `#${pixelData[0].toString(16).padStart(2, '0')}${pixelData[1].toString(16).padStart(2, '0')}${pixelData[2].toString(16).padStart(2, '0')}`,
-                    rgb: `rgb(${pixelData[0]}, ${pixelData[1]}, ${pixelData[2]})`
-                };
+                const color = formatColorData(pixelData[0], pixelData[1], pixelData[2], pixelData[3]);
                 sendResponse({ success: true, data: color });
             };
             img.onerror = function() {
@@ -85,17 +94,18 @@ function injectResultOverlay() {
         
         const overlay = document.createElement('div');
         overlay.id = 'result-overlay';
+
+        const content = document.createElement('div');
+        content.className = 'result-overlay-content';
         
-        overlay.innerHTML = `
-            <div class="result-overlay-content">
-                <div class="color-preview-box-container">
-                    <div class="color-preview-box" style="background: color.lighter;"></div>
-                    <div class="color-preview-box-selected" style="background: color.hex;"></div>
-                    <div class="color-preview-box" style="background: color.darker;"></div>
-                </div>
-                <p class="color-hex">color.hex</p>
-                <p class="color-rgb">color.rgb</p>
+        content.innerHTML = `
+            <div class="color-preview-box-container">
+                <div class="color-preview-box" style="background: color.lighter;"></div>
+                <div class="color-preview-box-selected" style="background: color.hex;"></div>
+                <div class="color-preview-box" style="background: color.darker;"></div>
             </div>
+            <p class="color-hex">color.hex</p>
+            <p class="color-rgb">color.rgb</p>
         `;
 
         const handleEscape = function(e) {
@@ -105,16 +115,32 @@ function injectResultOverlay() {
             }
         };
         document.addEventListener('keydown', handleEscape);
+        overlay.addEventListener('click', function(e) {
+            overlay.remove();
+        });
+
+        content.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        overlay.appendChild(content);
         document.body.appendChild(overlay);
     } catch (err) {
         console.error('Result overlay injection error:', err);
     }
 }
 
+function calculateLighterColor(color) {
+    return formatColorData(Math.min(Math.round(color.r * 1.2), 255), Math.min(Math.round(color.g * 1.2), 255), Math.min(Math.round(color.b * 1.2), 255), color.a);
+}
+
+function calculateDarkerColor(color) {
+    return formatColorData(Math.max(Math.round(color.r * 0.8), 0), Math.max(Math.round(color.g * 0.8), 0), Math.max(Math.round(color.b * 0.8), 0), color.a);
+}
+
 function StringifyResultOverlay(color) {
-    let lighter = "rgb(" + color.rgb.replace("rgb(", "").replace(")", "").split(",").map(Number).map(x => Math.min(Math.round(x * 1.2), 255)).join(",") + ")";
-    let darker = "rgb(" + color.rgb.replace("rgb(", "").replace(")", "").split(",").map(Number).map(x => Math.max(Math.round(x * 0.8), 0)).join(",") + ")";
-    return `(${injectResultOverlay.toString()})()`.replaceAll("color.hex", color.hex).replaceAll("color.rgb", color.rgb).replaceAll("color.lighter", lighter).replaceAll("color.darker", darker);
+    return `(${injectResultOverlay.toString()})()`.replaceAll("color.hex", color.hex).replaceAll("color.rgb", color.rgb).replaceAll("color.lighter", calculateLighterColor(color).rgb).replaceAll("color.darker", calculateDarkerColor(color).rgb);
 }
 
 async function handleResultOverlay(tabId, color) {
