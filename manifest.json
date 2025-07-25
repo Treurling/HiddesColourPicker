@@ -1,0 +1,26 @@
+{
+    "manifest_version": 2,
+    "name": "Simple Colour Picker",
+    "version": "0.0.1",
+    "description": "A simple colour picker extension, that allows you to pick a colour from any website and copy it to your clipboard.",
+    "permissions": ["activeTab", "scripting", "<all_urls>", "tabs"],
+    "browser_action": {
+        "default_icon": "icon.png",
+        "default_popup": "popup.html"
+    },
+    "content_scripts": [
+        {
+            "matches": ["<all_urls>"],
+            "js": ["dist/content.bundle.js"],
+            "run_at": "document_end",
+            "all_frames": false
+        }
+    ],
+    "background": {
+        "scripts": ["dist/background.bundle.js"],
+        "persistent": true
+    },
+    "web_accessible_resources": [
+        "dist/content.bundle.js"
+    ]
+}

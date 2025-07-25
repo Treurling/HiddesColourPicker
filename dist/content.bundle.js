@@ -1,0 +1,1 @@
+window.addEventListener("ColorPicked",function(e){var o=e.detail,n=o.x,s=o.y;browser.runtime.sendMessage({action:"getPixelColor",coordinates:{x:n,y:s}}).then(function(e){e&&e.success&&browser.runtime.sendMessage({action:"ShowResultOverlay",color:e.data})})});
