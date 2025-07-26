@@ -35,6 +35,22 @@ function rgbToHex(r, g, b) {
     return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
 }
 
+// Parse RGB string to color object
+function parseRgbString(rgbString) {
+    const match = rgbString.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (match) {
+        return {
+            r: parseInt(match[1]),
+            g: parseInt(match[2]),
+            b: parseInt(match[3]),
+            a: 255,
+            hex: rgbToHex(parseInt(match[1]), parseInt(match[2]), parseInt(match[3])),
+            rgb: rgbString
+        };
+    }
+    return null;
+}
+
 function formatColorData(r, g, b, a) {
     return {
         r: r,
@@ -44,6 +60,14 @@ function formatColorData(r, g, b, a) {
         hex: rgbToHex(r, g, b),
         rgb: `rgb(${r}, ${g}, ${b})`
     }
+}
+
+function calculateLighterColor(color) {
+    return formatColorData(Math.min(Math.round(color.r * 1.2), 255), Math.min(Math.round(color.g * 1.2), 255), Math.min(Math.round(color.b * 1.2), 255), color.a);
+}
+
+function calculateDarkerColor(color) {
+    return formatColorData(Math.max(Math.round(color.r * 0.8), 0), Math.max(Math.round(color.g * 0.8), 0), Math.max(Math.round(color.b * 0.8), 0), color.a);
 }
 
 // Handle the color picker request
@@ -78,7 +102,7 @@ async function handleColorPickerRequest(tabId, coordinates, sendResponse) {
     }
 }
 
-function injectResultOverlay() {
+function injectResultOverlay(color, tabId) {
     try {
         const existingOverlay = document.getElementById('result-overlay');
         if (existingOverlay) existingOverlay.remove();
@@ -97,16 +121,55 @@ function injectResultOverlay() {
 
         const content = document.createElement('div');
         content.className = 'result-overlay-content';
-        
-        content.innerHTML = `
-            <div class="color-preview-box-container">
-                <div class="color-preview-box" style="background: color.lighter;"></div>
-                <div class="color-preview-box-selected" style="background: color.hex;"></div>
-                <div class="color-preview-box" style="background: color.darker;"></div>
-            </div>
-            <p class="color-hex">color.hex</p>
-            <p class="color-rgb">color.rgb</p>
-        `;
+
+        const colorContainer = document.createElement('div');
+        colorContainer.className = 'color-preview-box-container';
+
+        const lighterColor = document.createElement('div');
+        lighterColor.className = 'color-preview-box';
+        lighterColor.style.backgroundColor = color.lighter;
+        colorContainer.appendChild(lighterColor);
+
+        lighterColor.addEventListener('click', function() {
+            browser.runtime.sendMessage({
+                action: 'ShowResultOverlay',
+                tabId: tabId,
+                color: color.lighter
+            });
+        });
+
+        const selectedColor = document.createElement('div');
+        selectedColor.className = 'color-preview-box-selected';
+        selectedColor.style.backgroundColor = color.hex;
+        colorContainer.appendChild(selectedColor);
+
+        selectedColor.addEventListener('click', function() {
+            navigator.clipboard.writeText(color.hex);
+        });
+
+        const darkerColor = document.createElement('div');
+        darkerColor.className = 'color-preview-box';
+        darkerColor.style.backgroundColor = color.darker;
+        colorContainer.appendChild(darkerColor);
+
+        darkerColor.addEventListener('click', function() {
+            browser.runtime.sendMessage({
+                action: 'ShowResultOverlay',
+                tabId: tabId,
+                color: color.darker
+            });
+        });
+
+        content.appendChild(colorContainer);
+        const colorHex = document.createElement('p');
+        colorHex.className = 'color-hex';
+        colorHex.textContent = color.hex;
+        content.appendChild(colorHex);
+
+        const colorRgb = document.createElement('p');
+        colorRgb.className = 'color-rgb';
+        colorRgb.textContent = color.rgb;
+        content.appendChild(colorRgb);
 
         const handleEscape = function(e) {
             if (e.key === 'Escape') { 
@@ -131,22 +194,25 @@ function injectResultOverlay() {
     }
 }
 
-function calculateLighterColor(color) {
-    return formatColorData(Math.min(Math.round(color.r * 1.2), 255), Math.min(Math.round(color.g * 1.2), 255), Math.min(Math.round(color.b * 1.2), 255), color.a);
-}
-
-function calculateDarkerColor(color) {
-    return formatColorData(Math.max(Math.round(color.r * 0.8), 0), Math.max(Math.round(color.g * 0.8), 0), Math.max(Math.round(color.b * 0.8), 0), color.a);
-}
-
-function StringifyResultOverlay(color) {
-    return `(${injectResultOverlay.toString()})()`.replaceAll("color.hex", color.hex).replaceAll("color.rgb", color.rgb).replaceAll("color.lighter", calculateLighterColor(color).rgb).replaceAll("color.darker", calculateDarkerColor(color).rgb);
-}
-
 async function handleResultOverlay(tabId, color) {
     try {
+        // Determine if the input is an RGB string or a color object
+        const colorToInject = typeof color === 'string' ? parseRgbString(color) : color;
+        
+        if (!colorToInject) {
+            console.error('Invalid color format:', color);
+            return;
+        }
+
+        // Calculate lighter and darker colors before injection
+        const colorWithVariants = {
+            ...colorToInject,
+            lighter: calculateLighterColor(colorToInject).rgb,
+            darker: calculateDarkerColor(colorToInject).rgb
+        };
+        
         await browser.tabs.executeScript(tabId, {
-            code: StringifyResultOverlay(color)
+            code: `(${injectResultOverlay.toString()})(${JSON.stringify(colorWithVariants)}, ${JSON.stringify(tabId)})`
         });
     } catch (error) {
         console.error('Error injecting result overlay:', error);
