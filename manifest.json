@@ -5,7 +5,7 @@
     "description": "A simple colour picker extension, that allows you to pick a colour from any website and copy it to your clipboard.",
     "permissions": ["activeTab", "scripting", "<all_urls>", "tabs"],
     "browser_action": {
-        "default_icon": "icon.png",
+        "default_icon": "icons/colorPickerIcon48.png",
         "default_popup": "popup.html"
     },
     "background": {
@@ -21,5 +21,10 @@
                 "default": "Shift+Alt+C"
             }
         }
-    }
+    },
+    "icons": {
+    "32": "icons/colorPickerIcon32.png",
+    "48": "icons/colorPickerIcon48.png",
+    "96": "icons/colorPickerIcon96.png"
+  }
 }

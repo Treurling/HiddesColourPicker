@@ -6,8 +6,16 @@
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-    <h2>Simple Color Picker</h2>
-    <button id="pickColor" class="button">Pick Color from Page</button>
+	<div class="colors-topbar">
+    	<div class="color-block" style="background-color: #c6aeff;"></div>
+        <div class="color-block" style="background-color: #a591dc;"></div>
+        <div class="color-block" style="background-color: #8474b0;"></div>
+    </div>
+
+    <h2>Hidde's Color Picker</h2>
+
+    <button id="pickColor" class="button"><img src="icons/eyedropper_icon_136647.svg" id="eyedropper" alt="Pick Color from Page" class="icon">Pick Color from Page</button>
+    <p class="keyboard-shortcut-tip">or <br> Press <span class="keyboard-shortcut">Ctrl+Shift+C</span> to pick color.</p>
     <script src="popup.js"></script>
 </body>
 </html> 
