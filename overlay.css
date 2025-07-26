@@ -44,6 +44,7 @@
 .color-preview-box {
     width: 50px !important;
     height: 50px !important;
+    position: relative !important;
 }
 
 .color-preview-box:hover {
@@ -53,6 +54,7 @@
 .color-preview-box-selected {
     width: 100px !important;
     height: 50px !important;
+    position: relative !important;
 }
 
 .color-preview-box-selected:hover {
@@ -67,4 +69,29 @@
 
 .color-rgb {
     margin: 5px 0 !important;
+}
+
+.tooltip-text {
+    visibility: hidden !important;
+    background-color: #262626 !important;
+    text-align: center !important;
+    border-radius: 6px !important;
+    padding: 3px !important;
+    position: absolute !important;
+    z-index: 1 !important;
+    bottom: 110% !important;
+    left: 50% !important;
+    margin-left: -50% !important;
+    opacity: 0 !important;
+    transition: opacity 0.3s !important;
+}
+
+.color-preview-box:hover .tooltip-text {
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.color-preview-box-selected:hover .tooltip-text {
+    visibility: visible !important;
+    opacity: 1 !important;
 }

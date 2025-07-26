@@ -112,7 +112,7 @@ function injectResultOverlay(color, tabId) {
             const link = document.createElement('link');
             link.id = 'overlay-styles';
             link.rel = 'stylesheet';
-            link.href = browser.runtime.getURL('overlay.css');
+            link.href = browser.runtime.getURL('overlay.css') + '?v=' + Date.now();
             document.head.appendChild(link);
         }
         
@@ -127,36 +127,40 @@ function injectResultOverlay(color, tabId) {
 
         const lighterColor = document.createElement('div');
         lighterColor.className = 'color-preview-box';
-        lighterColor.style.backgroundColor = color.lighter;
+        lighterColor.style.backgroundColor = color.lighter.rgb;
+        lighterColor.innerHTML = `<span class="tooltip-text">${color.lighter.hex}</span>`;
         colorContainer.appendChild(lighterColor);
 
         lighterColor.addEventListener('click', function() {
             browser.runtime.sendMessage({
                 action: 'ShowResultOverlay',
                 tabId: tabId,
-                color: color.lighter
+                color: color.lighter.rgb
             });
         });
 
         const selectedColor = document.createElement('div');
         selectedColor.className = 'color-preview-box-selected';
         selectedColor.style.backgroundColor = color.hex;
+        selectedColor.innerHTML = `<span class="tooltip-text">copy to clipboard</span>`;
         colorContainer.appendChild(selectedColor);
 
         selectedColor.addEventListener('click', function() {
             navigator.clipboard.writeText(color.hex);
+            selectedColor.innerHTML = `<span class="tooltip-text">copied to clipboard!</span>`;
         });
 
         const darkerColor = document.createElement('div');
         darkerColor.className = 'color-preview-box';
-        darkerColor.style.backgroundColor = color.darker;
+        darkerColor.style.backgroundColor = color.darker.rgb;
+        darkerColor.innerHTML = `<span class="tooltip-text">${color.darker.hex}</span>`;
         colorContainer.appendChild(darkerColor);
 
         darkerColor.addEventListener('click', function() {
             browser.runtime.sendMessage({
                 action: 'ShowResultOverlay',
                 tabId: tabId,
-                color: color.darker
+                color: color.darker.rgb
             });
         });
 
@@ -207,8 +211,8 @@ async function handleResultOverlay(tabId, color) {
         // Calculate lighter and darker colors before injection
         const colorWithVariants = {
             ...colorToInject,
-            lighter: calculateLighterColor(colorToInject).rgb,
-            darker: calculateDarkerColor(colorToInject).rgb
+            lighter: calculateLighterColor(colorToInject),
+            darker: calculateDarkerColor(colorToInject)
         };
         
         await browser.tabs.executeScript(tabId, {
@@ -230,7 +234,7 @@ function injectColorPickerOverlay() {
             const link = document.createElement('link');
             link.id = 'overlay-styles';
             link.rel = 'stylesheet';
-            link.href = browser.runtime.getURL('overlay.css');
+            link.href = browser.runtime.getURL('overlay.css') + '?v=' + Date.now();
             document.head.appendChild(link);
         }
         
