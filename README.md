@@ -1,3 +1,12 @@
-#Simple colour picker Firefox extension.
+**Simple colour picker extension for Firefox** 🦊
+-
+Lets you pick any colour from your screen in Firefox.
 
-Lets you pick any colour from your screen in Firefox. Open source for if you want to criticize my scripts.
+**Key features**
+- Quickly pick a colour from your screen using the `Shift+Alt+C` keyboard shortcut (or whatever you change it to in extension settings).
+- Find darker and lighter shades of your colour quickly.
+- Copy the HEX for your colour by clicking the preview of the colour.
+
+**Credits**
+
+Written by Hidde Kleijwegt
